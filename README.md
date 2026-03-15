@@ -1,62 +1,140 @@
-# OASIS Search Engine
+# OASIS: Open Access Searchable Information System
 
-OASIS is a local search-and-analytics application built from homework logic (HW1-HW3, excluding HW0).  
-It lets users search the Enron email corpus with multiple retrieval methods and explore email-network analytics in a single Streamlit UI.
+This project is built to demonstrate how modern and classical search/ranking methods work in a practical application.
 
-## Purpose
+It combines:
 
-- Turn notebook code into a reusable project.
-- Run fully on local machine (no cloud hosting required).
-- Precompute indexes once and reuse them across app restarts.
-- Provide both:
-  - **Email retrieval** (Boolean, TF-IDF, BM25, DESM, weighted fusion)
-  - **Graph analytics** (PageRank, Personalized PageRank, HITS)
+- a modern Streamlit interface
+- a precomputed index pipeline
+- multiple retrieval/ranking methods
+- graph-based authority analytics
+- deployable cloud hosting
 
-## How the app works
+## Live App
 
-This project has a clean split between **logic** and **UI**:
+**Hosted on Streamlit Community Cloud:**  
+[https://open-access-searchable-information-system.streamlit.app/](https://open-access-searchable-information-system.streamlit.app/)
+
+## Key Features
+
+- Multi-method search over an email corpus:
+  - Boolean retrieval
+  - TF-IDF + cosine similarity
+  - BM25 ranking
+  - DESM-style semantic matching
+  - weighted fusion ranking (`all` mode)
+- Interactive result exploration:
+  - ranked list with metadata
+  - click-to-open full email viewer
+- Graph analytics over communication network:
+  - PageRank
+  - Personalized PageRank
+  - HITS (hubs/authorities)
+- Deployment-ready architecture with runtime cache download
+
+## What This Project Demonstrates
+
+- How classic IR methods behave on real email corpora.
+- How semantic and lexical signals can be combined for ranking.
+- How graph centrality methods identify important actors in communication networks.
+- How these ideas can be packaged into a production-style interactive app.
+
+## Tech Stack
+
+- **Frontend**: Streamlit
+- **Language**: Python
+- **Numerical/Data**: NumPy, Pandas
+- **Graph Analytics**: NetworkX
+- **Deployment**: Streamlit Community Cloud
+- **Cache Hosting**: external object/file URL (Google Drive via `CACHE_URL`)
+
+## Methods Implemented
+
+### Retrieval and Ranking
+
+- **Boolean Retrieval**
+  - Supports strict query operators: `AND`, `OR`, `NOT`.
+  - Best when users need precise logical constraints.
+
+- **TF-IDF + Cosine Similarity**
+  - Terms are weighted by importance in corpus.
+  - Ranks documents by vector similarity to query.
+
+- **BM25 (Okapi)**
+  - Probabilistic ranking with document-length normalization.
+  - Uses term frequency saturation and inverse document frequency.
+  - Strong lexical baseline for ranked search.
+
+- **DESM-style Semantic Matching**
+  - Uses vector representations to capture semantic similarity.
+  - Helps retrieve relevant emails even when exact terms differ.
+
+- **Weighted Fusion (`all` mode)**
+  - Combines Boolean + TF-IDF + BM25 + DESM into one ranked list.
+  - Higher weight is assigned to BM25 and DESM for practical relevance quality.
+
+### Graph Analytics
+
+- **PageRank**
+  - Finds globally influential nodes in the email graph.
+
+- **Personalized PageRank**
+  - Biases ranking around a selected user (e.g., `john.arnold@enron.com`).
+
+- **HITS**
+  - Separates nodes into **hubs** and **authorities**.
+
+## Architecture
 
 - `backend/app/services/search_engine.py`
-  - parses emails
-  - tokenizes/preprocesses text
-  - builds search indexes
-  - executes Boolean / TF-IDF / BM25 / DESM retrieval
+  - parsing, preprocessing, indexing, and ranking algorithms
 - `backend/app/services/graph_engine.py`
-  - parses `From` / `To`
-  - builds email interaction graph
-  - computes PageRank, Personalized PageRank, HITS
+  - graph construction and centrality algorithms
 - `frontend/streamlit_app.py`
-  - renders search UI and email viewer
-  - loads cached index objects
-  - calls service methods directly in-process
+  - search UI, result list, click-to-open email viewer
+- `scripts/precompute_index.py`
+  - one-time index + graph cache builder
 
-Although there is a FastAPI scaffold in `backend/app/main.py`, the current workflow is **local-first** and does **not** require running `uvicorn`.
+The app runs local-first and in-process; no separate backend server is required for normal use.
 
-## Project structure
+### Runtime Flow
+
+1. App starts and checks `data/index_cache.pkl`.
+2. If missing, app downloads cache from `CACHE_URL` (Streamlit secrets / env).
+3. Cached search + graph objects are loaded.
+4. Query is executed with selected retrieval mode.
+5. Results are rendered; user can open full email content.
+
+## Repository Structure
 
 ```text
 backend/
   app/
-    main.py
-    models.py
     services/
       search_engine.py
       graph_engine.py
-      state.py
 frontend/
   streamlit_app.py
 scripts/
   precompute_index.py
 data/
-  index_cache.pkl                # generated once
+  index_cache.pkl              # generated at runtime (not tracked in git)
 .archive/
-  homeworks/                     # original notebooks
+  homeworks/                   # archived local resources
   datasets/
-    enron_sent_mail/             # archived corpus
+    enron_sent_mail/           # local archived source dataset
 requirements.txt
 ```
 
-## Setup and run
+## Example Queries
+
+- `buyer`
+- `gas floor`
+- `winter OR summer`
+- `margins AND limits`
+- `buyers AND risk AND NOT crazy`
+
+## Local Run
 
 ### 1) Create environment
 
@@ -71,68 +149,55 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3) Precompute indexes (one-time)
+### 3) Build cache once
 
 ```bash
 python scripts/precompute_index.py --dataset .archive/datasets/enron_sent_mail --cache data/index_cache.pkl
 ```
 
-### 4) Launch app
+### 4) Start app
 
 ```bash
 streamlit run frontend/streamlit_app.py
 ```
 
-The app auto-loads `data/index_cache.pkl`.  
-You only need to rebuild cache when dataset/logic changes.
+## Streamlit Cloud Deployment
 
-## Deploy on Streamlit Community Cloud
+Because the cache file is large, it is not committed to GitHub.  
+At startup, the app downloads cache from external storage (Google Drive link in Secrets).
 
-1. Push code to GitHub (without large cache/data files).
-2. In Streamlit Cloud, create app from your GitHub repo.
-3. Set app secret:
+Set this in Streamlit app secrets:
 
 ```toml
-CACHE_URL = "https://drive.google.com/uc?export=download&id=YOUR_FILE_ID"
+CACHE_URL = "https://drive.google.com/uc?export=download&id=<FILE_ID>"
 ```
 
-4. On first startup, app downloads cache to `data/index_cache.pkl` and loads it automatically.
+On first cloud run:
+- app downloads `index_cache.pkl`
+- loads indexes
+- starts serving search/analytics UI
 
-Notes:
-- Google Drive links require a **file** link (not folder).
-- The file must be shared as **Anyone with the link (Viewer)**.
+## Why Weighted Fusion
 
-## Retrieval methods (brief)
+Single retrieval methods capture different notions of relevance:
 
-- **Boolean Retrieval**
-  - Exact logic-based matching using `AND`, `OR`, `NOT`.
-  - Great for strict filtering; less flexible semantically.
+- BM25 is strong for lexical/document relevance.
+- DESM improves semantic matching when exact wording differs.
+- TF-IDF provides a solid vector-space baseline.
+- Boolean provides strict constraints when operators are explicitly used.
 
-- **TF-IDF + Cosine Similarity**
-  - Weighs terms by importance in corpus (rare terms get higher weight).
-  - Good baseline vector-space ranking.
+The fused `all` mode combines these signals, with higher practical weight on BM25 and DESM.
 
-- **BM25**
-  - Probabilistic ranking function with document-length normalization.
-  - Usually stronger lexical relevance than plain TF-IDF for ranked retrieval.
+## Future Work
 
-- **DESM-style Semantic Matching**
-  - Uses vector-based term/document representations for semantic similarity.
-  - Helps retrieve conceptually related emails even with term mismatch.
-
-- **`all` mode (weighted fusion)**
-  - Combines scores from all four methods into one ranked list.
-  - Higher weights are assigned to BM25 and DESM for stronger relevance.
-
-## Graph analytics methods (brief)
-
-- **PageRank**: global influence in the communication network.
-- **Personalized PageRank**: influence relative to a chosen user seed.
-- **HITS**: hub and authority roles in the email graph.
+- Query-term highlighting in subject/snippet.
+- Pagination and result export.
+- Faster/lighter cache format for quicker cold-start.
+- Explainability panel (per-method contribution to final fused score).
+- Optional feedback loop for query refinement.
 
 ## Notes
 
-- Local-only app, designed for personal workstation usage.
-- Compatible with Python 3.14 dependency set used in this repository.
-- Legacy homework files and raw dataset are kept under `.archive/` to keep root clean.
-- `data/index_cache.pkl` is intentionally excluded from git and fetched at runtime for deployment.
+- Local datasets/resources are intentionally archived under `.archive/`.
+- Generated artifacts (`data/index_cache.pkl`, `__pycache__`, `.venv`) are excluded from git.
+- Rebuild cache only when dataset or ranking logic changes.
